@@ -4,38 +4,22 @@ pipeline {
             yaml '''
                 apiVersion: v1
                 kind: Pod
-                metadata:
-                  labels:
-                    jenkins: slave
                 spec:
-                  serviceAccountName: jenkins
                   containers:
-                  - name: jnlp
-                    image: jenkins/inbound-agent:latest
-                    
-                  # Docker container'ı - image build ve push işlemleri için
                   - name: docker
                     image: docker:dind
-                    securityContext:
-                      privileged: true
-                    volumeMounts:
-                    - name: docker-socket
-                      mountPath: /var/run/docker.sock
-                    tty: true
-                    
-                  # Python container'ı - SonarQube analizi için
-                  - name: python
-                    image: python:3.9-slim
                     command:
                     - cat
                     tty: true
-                    
+                    privileged: true
+                    volumeMounts:
+                    - name: docker-socket
+                      mountPath: /var/run/docker.sock
                   volumes:
                   - name: docker-socket
                     hostPath:
                       path: /var/run/docker.sock
             '''
-            defaultContainer 'docker'
         }
     }
     
@@ -53,21 +37,13 @@ pipeline {
         
         stage('SonarQube Analysis') {
             steps {
-                container('python') {
-                    script {
-                        def scannerHome = tool 'SonarQubeScanner'
-                        withSonarQubeEnv('SonarQube') {
-                            sh """
-                                ${scannerHome}/bin/sonar-scanner \
-                                -Dsonar.projectKey=task-manager-api \
-                                -Dsonar.sources=. \
-                                -Dsonar.python.version=3.9 \
-                                -Dsonar.python.coverage.reportPaths=coverage.xml \
-                                -Dsonar.sourceEncoding=UTF-8 \
-                                -Dsonar.language=python \
-                                -Dsonar.exclusions=**/*test*.py,**/migrations/**,**/__pycache__/**
-                            """
-                        }
+                script {
+                    def scannerHome = tool 'SonarQubeScanner'
+                    withSonarQubeEnv('SonarQube') {
+                        sh "${scannerHome}/bin/sonar-scanner \
+                            -Dsonar.projectKey=task-manager-api \
+                            -Dsonar.sources=. \
+                            -Dsonar.python.version=3.9"
                     }
                 }
             }
@@ -75,7 +51,7 @@ pipeline {
         
         stage('Quality Gate') {
             steps {
-                timeout(time: 30, unit: 'MINUTES') {
+                timeout(time: 1, unit: 'HOURS') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -85,12 +61,7 @@ pipeline {
             steps {
                 container('docker') {
                     script {
-                        sh """
-                            docker build \
-                                --cache-from ${DOCKER_IMAGE}:latest \
-                                -t ${DOCKER_IMAGE}:${DOCKER_TAG} \
-                                -t ${DOCKER_IMAGE}:latest .
-                        """
+                        docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
                     }
                 }
             }
@@ -102,23 +73,11 @@ pipeline {
                     script {
                         docker.withRegistry('https://registry.hub.docker.com', 'docker-credentials') {
                             docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                            docker.image("${DOCKER_IMAGE}:latest").push()
+                            docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push('latest')
                         }
                     }
                 }
             }
-        }
-    }
-    
-    post {
-        always {
-            cleanWs()
-        }
-        success {
-            echo 'Pipeline başarıyla tamamlandı!'
-        }
-        failure {
-            echo 'Pipeline başarısız oldu! Lütfen logları kontrol edin.'
         }
     }
 }
