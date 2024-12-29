@@ -15,6 +15,11 @@ pipeline {
                     volumeMounts:
                     - name: docker-socket
                       mountPath: /var/run/docker.sock
+                  - name: python
+                    image: python:3.9
+                    command:
+                    - cat
+                    tty: true
                   volumes:
                   - name: docker-socket
                     hostPath:
@@ -26,6 +31,8 @@ pipeline {
     environment {
         DOCKER_IMAGE = 'yenisehirli/task-manager-api'
         DOCKER_TAG = "${BUILD_NUMBER}"
+        SONAR_PROJECT_KEY = 'task-manager-api'
+        SONAR_PROJECT_NAME = 'Task Manager API'
     }
     
     stages {
@@ -37,13 +44,22 @@ pipeline {
         
         stage('SonarQube Analysis') {
             steps {
-                script {
-                    def scannerHome = tool 'SonarQubeScanner'
-                    withSonarQubeEnv('SonarQube') {
-                        sh "${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=task-manager-api \
-                            -Dsonar.sources=. \
-                            -Dsonar.python.version=3.9"
+                container('python') {  
+                    script {
+                        def scannerHome = tool 'SonarQubeScanner'
+                        withSonarQubeEnv('SonarQube') {
+                            sh """
+                                ${scannerHome}/bin/sonar-scanner \
+                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                                -Dsonar.projectName=${SONAR_PROJECT_NAME} \
+                                -Dsonar.sources=. \
+                                -Dsonar.python.version=3.9 \
+                                -Dsonar.python.coverage.reportPaths=coverage.xml \
+                                -Dsonar.sourceEncoding=UTF-8 \
+                                -Dsonar.language=python \
+                                -Dsonar.exclusions=**/*test*.py,**/migrations/**,**/__pycache__/**
+                            """
+                        }
                     }
                 }
             }
@@ -51,7 +67,7 @@ pipeline {
         
         stage('Quality Gate') {
             steps {
-                timeout(time: 1, unit: 'HOURS') {
+                timeout(time: 30, unit: 'MINUTES') {  
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -61,7 +77,12 @@ pipeline {
             steps {
                 container('docker') {
                     script {
-                        docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
+                        sh """
+                            docker build \
+                                --cache-from ${DOCKER_IMAGE}:latest \
+                                -t ${DOCKER_IMAGE}:${DOCKER_TAG} \
+                                -t ${DOCKER_IMAGE}:latest .
+                        """
                     }
                 }
             }
@@ -73,11 +94,23 @@ pipeline {
                     script {
                         docker.withRegistry('https://registry.hub.docker.com', 'docker-credentials') {
                             docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                            docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push('latest')
+                            docker.image("${DOCKER_IMAGE}:latest").push()
                         }
                     }
                 }
             }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            echo 'Pipeline successfully completed!'
+        }
+        failure {
+            echo 'Pipeline failed! Please check the logs for details.'
         }
     }
 }
