@@ -36,26 +36,27 @@ pipeline {
         }
         
         stage('SonarQube Analysis') {
-            steps {
-                script {
-                    def scannerHome = tool 'SonarQubeScanner'
-                    withSonarQubeEnv('SonarQube') {
-                        sh "${scannerHome}/bin/sonar-scanner \
-                            -Dsonar.projectKey=task-manager-api \
-                            -Dsonar.sources=. \
-                            -Dsonar.python.version=3.9"
-                    }
-                }
-            }
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh """
+                ${tool('SonarQubeScanner')}/bin/sonar-scanner \
+                -Dsonar.projectKey=task-manager-api \
+                -Dsonar.projectName='Task Manager API' \
+                -Dsonar.sources=. \
+                -Dsonar.python.version=3.9 \
+                -Dsonar.qualitygate.wait=true
+            """
         }
-        
-        stage('Quality Gate') {
-            steps {
-                timeout(time: 1, unit: 'HOURS') {
-                    waitForQualityGate abortPipeline: true
-                }
-            }
+    }
+}
+
+stage('Quality Gate') {
+    steps {
+        timeout(time: 2, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
         }
+    }
+}
         
         stage('Build Docker Image') {
             steps {
