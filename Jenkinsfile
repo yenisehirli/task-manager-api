@@ -22,6 +22,9 @@ pipeline {
             '''
         }
     }
+    triggers {
+        githubPush()
+    }
     
     environment {
         DOCKER_IMAGE = 'yenisehirli/task-manager-api'
