@@ -1,7 +1,8 @@
 pipeline {
     agent {
         kubernetes {
-            label 'jenkins-agent'
+            inheritFrom 'jenkins-agent'
+            defaultContainer 'docker'
         }
     }
     triggers {
