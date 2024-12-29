@@ -1,6 +1,12 @@
 from flask import Flask, request, jsonify
 from datetime import datetime
 
+"""
+Task Manager API
+A simple RESTful API for managing tasks
+Version: 1.0
+"""
+
 app = Flask(__name__)
 
 
