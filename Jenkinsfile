@@ -4,38 +4,44 @@ pipeline {
             yaml '''
                 apiVersion: v1
                 kind: Pod
+                metadata:
+                  labels:
+                    jenkins: slave
                 spec:
+                  serviceAccountName: jenkins
                   containers:
                   - name: jnlp
-                    image: jenkins/inbound-agent:3107.v665000b_51092-5
-                    tty: true
+                    image: jenkins/inbound-agent:latest
+                    
+                  # Docker container'ı - image build ve push işlemleri için
                   - name: docker
                     image: docker:dind
-                    command:
-                    - cat
-                    tty: true
-                    privileged: true
+                    securityContext:
+                      privileged: true
                     volumeMounts:
                     - name: docker-socket
                       mountPath: /var/run/docker.sock
+                    tty: true
+                    
+                  # Python container'ı - SonarQube analizi için
                   - name: python
                     image: python:3.9-slim
                     command:
                     - cat
                     tty: true
+                    
                   volumes:
                   - name: docker-socket
                     hostPath:
                       path: /var/run/docker.sock
             '''
+            defaultContainer 'docker'
         }
     }
     
     environment {
         DOCKER_IMAGE = 'yenisehirli/task-manager-api'
         DOCKER_TAG = "${BUILD_NUMBER}"
-        SONAR_PROJECT_KEY = 'task-manager-api'
-        SONAR_PROJECT_NAME = 'Task Manager API'
     }
     
     stages {
@@ -47,14 +53,13 @@ pipeline {
         
         stage('SonarQube Analysis') {
             steps {
-                container('python') {  
+                container('python') {
                     script {
                         def scannerHome = tool 'SonarQubeScanner'
                         withSonarQubeEnv('SonarQube') {
                             sh """
                                 ${scannerHome}/bin/sonar-scanner \
-                                -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                                -Dsonar.projectName=${SONAR_PROJECT_NAME} \
+                                -Dsonar.projectKey=task-manager-api \
                                 -Dsonar.sources=. \
                                 -Dsonar.python.version=3.9 \
                                 -Dsonar.python.coverage.reportPaths=coverage.xml \
@@ -70,7 +75,7 @@ pipeline {
         
         stage('Quality Gate') {
             steps {
-                timeout(time: 30, unit: 'MINUTES') {  
+                timeout(time: 30, unit: 'MINUTES') {
                     waitForQualityGate abortPipeline: true
                 }
             }
@@ -110,10 +115,10 @@ pipeline {
             cleanWs()
         }
         success {
-            echo 'Pipeline successfully completed!'
+            echo 'Pipeline başarıyla tamamlandı!'
         }
         failure {
-            echo 'Pipeline failed! Please check the logs for details.'
+            echo 'Pipeline başarısız oldu! Lütfen logları kontrol edin.'
         }
     }
 }
