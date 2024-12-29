@@ -1,25 +1,7 @@
 pipeline {
     agent {
         kubernetes {
-            yaml '''
-                apiVersion: v1
-                kind: Pod
-                spec:
-                  containers:
-                  - name: docker
-                    image: docker:dind
-                    command:
-                    - cat
-                    tty: true
-                    privileged: true
-                    volumeMounts:
-                    - name: docker-socket
-                      mountPath: /var/run/docker.sock
-                  volumes:
-                  - name: docker-socket
-                    hostPath:
-                      path: /var/run/docker.sock
-            '''
+            label 'jenkins-agent'
         }
     }
     triggers {
