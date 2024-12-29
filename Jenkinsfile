@@ -6,6 +6,9 @@ pipeline {
                 kind: Pod
                 spec:
                   containers:
+                  - name: jnlp
+                    image: jenkins/inbound-agent:3107.v665000b_51092-5
+                    tty: true
                   - name: docker
                     image: docker:dind
                     command:
@@ -16,7 +19,7 @@ pipeline {
                     - name: docker-socket
                       mountPath: /var/run/docker.sock
                   - name: python
-                    image: python:3.9
+                    image: python:3.9-slim
                     command:
                     - cat
                     tty: true
