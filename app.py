@@ -7,8 +7,7 @@ A simple RESTful API for managing tasks
 Version: 1.0
 """
 
-# deneme , deneme 2 , deneme 3
-
+# deneme , deneme 2 
 app = Flask(__name__)
 
 
