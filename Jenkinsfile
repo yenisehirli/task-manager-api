@@ -8,13 +8,15 @@ pipeline {
                 spec:
                   containers:
                   - name: docker
-                    image: docker:latest
-                    command:
-                    - cat
+                    image: docker:dind
+                    securityContext:
+                      privileged: true
                     tty: true
-                    volumeMounts:
-                    - mountPath: /var/run/docker.sock
-                      name: docker-sock
+                    command:
+                    - dockerd-entrypoint.sh
+                  volumeMounts:
+                    - name: docker-sock
+                      mountPath: /var/run/docker.sock
                   volumes:
                   - name: docker-sock
                     hostPath:
@@ -38,16 +40,18 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                withSonarQubeEnv('SonarQube') {
-                    sh """
-                        sonar-scanner \
-                        -Dsonar.host.url=http://10.43.16.30:30900 \
-                        -Dsonar.login=${SONAR_TOKEN} \
-                        -Dsonar.projectKey=task-manager-api \
-                        -Dsonar.projectName='Task Manager API' \
-                        -Dsonar.sources=. \
-                        -Dsonar.python.version=3.9
-                    """
+                container('docker') {
+                    withSonarQubeEnv('SonarQube') {
+                        sh """
+                            sonar-scanner \
+                            -Dsonar.host.url=http://10.43.16.30:30900 \
+                            -Dsonar.login=${SONAR_TOKEN} \
+                            -Dsonar.projectKey=task-manager-api \
+                            -Dsonar.projectName='Task Manager API' \
+                            -Dsonar.sources=. \
+                            -Dsonar.python.version=3.9
+                        """
+                    }
                 }
             }
         }
@@ -81,7 +85,9 @@ pipeline {
 
     post {
         always {
-            sh 'docker logout'
+            container('docker') {
+                sh 'docker logout'
+            }
         }
     }
 }
