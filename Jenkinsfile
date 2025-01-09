@@ -8,13 +8,14 @@ pipeline {
                 spec:
                   containers:
                   - name: docker
-                    image: docker:dind
+                    image: docker:latest
+                    command:
+                    - sleep
+                    args:
+                    - infinity
                     securityContext:
                       privileged: true
-                    tty: true
-                    command:
-                    - dockerd-entrypoint.sh
-                  volumeMounts:
+                    volumeMounts:
                     - name: docker-sock
                       mountPath: /var/run/docker.sock
                   volumes:
@@ -59,25 +60,21 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    sh """
-                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
-                    """
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
                 }
             }
         }
 
         stage('Push Docker Image') {
-            environment {
-                DOCKER_CREDENTIALS = credentials('docker-credentials')
-            }
             steps {
                 container('docker') {
-                    sh """
-                        echo ${DOCKER_CREDENTIALS_PSW} | docker login -u ${DOCKER_CREDENTIALS_USR} --password-stdin
-                        docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
-                        docker push ${DOCKER_IMAGE}:latest
-                    """
+                    withCredentials([usernamePassword(credentialsId: 'docker-credentials', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USERNAME')]) {
+                        sh """
+                            echo \$DOCKER_PASSWORD | docker login -u \$DOCKER_USERNAME --password-stdin
+                            docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
+                            docker push ${DOCKER_IMAGE}:latest
+                        """
+                    }
                 }
             }
         }
@@ -86,7 +83,7 @@ pipeline {
     post {
         always {
             container('docker') {
-                sh 'docker logout'
+                sh 'docker logout || true'
             }
         }
     }
