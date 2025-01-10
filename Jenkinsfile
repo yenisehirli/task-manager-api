@@ -42,16 +42,21 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 container('docker') {
+                    sh '''
+                        wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
+                        unzip sonar-scanner-cli-4.8.0.2856-linux.zip
+                        mv sonar-scanner-4.8.0.2856-linux sonar-scanner
+                    '''
                     withSonarQubeEnv('SonarQube') {
-                        sh """
-                            sonar-scanner \
+                        sh '''
+                            ./sonar-scanner/bin/sonar-scanner \
                             -Dsonar.host.url=http://10.43.16.30:30900 \
                             -Dsonar.login=${SONAR_TOKEN} \
                             -Dsonar.projectKey=task-manager-api \
                             -Dsonar.projectName='Task Manager API' \
                             -Dsonar.sources=. \
                             -Dsonar.python.version=3.9
-                        """
+                        '''
                     }
                 }
             }
