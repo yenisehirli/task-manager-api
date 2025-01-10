@@ -14,17 +14,17 @@ pipeline {
                     env:
                     - name: DOCKER_TLS_CERTDIR
                       value: ""
-                    volumeMounts:
-                    - mountPath: /var/run
-                      name: docker-sock
+                    - name: DOCKER_HOST
+                      value: "tcp://localhost:2375"
+                    resources:
+                      requests:
+                        cpu: "500m"
+                        memory: "512Mi"
                   - name: sonar-scanner
                     image: sonarsource/sonar-scanner-cli:latest
                     command:
                     - cat
                     tty: true
-                  volumes:
-                  - name: docker-sock
-                    emptyDir: {}
             '''
         }
     }
@@ -63,9 +63,13 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    sh 'dockerd-entrypoint.sh &'
-                    sh 'sleep 20'
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh '''
+                        until docker info; do
+                            echo "Waiting for docker daemon..."
+                            sleep 5
+                        done
+                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                    '''
                 }
             }
         }
