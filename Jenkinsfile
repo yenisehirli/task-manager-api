@@ -30,6 +30,12 @@ pipeline {
         }
     }
 
+    environment {
+        DOCKER_IMAGE = 'yenisehirli/task-manager-api'
+        DOCKER_TAG = "${BUILD_NUMBER}"
+        SONAR_TOKEN = credentials('sonar-token')
+    }
+
     stages {
         stage('Checkout') {
             steps {
@@ -41,15 +47,17 @@ pipeline {
             steps {
                 container('sonar-scanner') {
                     withSonarQubeEnv('SonarQube') {
-                        sh '''
-                            sonar-scanner \
-                            -Dsonar.host.url=http://10.43.16.30:30900 \
-                            -Dsonar.token=$SONAR_TOKEN \
-                            -Dsonar.projectKey=task-manager-api \
-                            -Dsonar.projectName="Task Manager API" \
-                            -Dsonar.sources=. \
-                            -Dsonar.python.version=3.9
-                        '''
+                        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+                            sh """
+                                sonar-scanner \\
+                                -Dsonar.host.url=http://10.43.16.30:30900 \\
+                                -Dsonar.token=\${SONAR_TOKEN} \\
+                                -Dsonar.projectKey=task-manager-api \\
+                                -Dsonar.projectName='Task Manager API' \\
+                                -Dsonar.sources=. \\
+                                -Dsonar.python.version=3.9
+                            """
+                        }
                     }
                 }
             }
@@ -58,9 +66,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    sh """
-                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                    """
+                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
                 }
             }
         }
@@ -71,11 +77,11 @@ pipeline {
             }
             steps {
                 container('docker') {
-                    sh '''
-                        echo $DOCKER_CREDENTIALS_PSW | docker login -u $DOCKER_CREDENTIALS_USR --password-stdin
+                    sh """
+                        echo \${DOCKER_CREDENTIALS_PSW} | docker login -u \${DOCKER_CREDENTIALS_USR} --password-stdin
                         docker push ${DOCKER_IMAGE}:${DOCKER_TAG}
                         docker push ${DOCKER_IMAGE}:latest
-                    '''
+                    """
                 }
             }
         }
