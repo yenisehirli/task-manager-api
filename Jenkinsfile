@@ -12,27 +12,22 @@ pipeline {
                     securityContext:
                       privileged: true
                     env:
-                    - name: DOCKER_TLS_CERTDIR
-                      value: ""
                     - name: DOCKER_HOST
-                      value: "tcp://localhost:2375"
-                    resources:
-                      requests:
-                        cpu: "500m"
-                        memory: "512Mi"
+                      value: unix:///var/run/docker.sock
+                    volumeMounts:
+                    - mountPath: /var/run/docker.sock
+                      name: docker-sock
                   - name: sonar-scanner
                     image: sonarsource/sonar-scanner-cli:latest
                     command:
                     - cat
                     tty: true
+                  volumes:
+                  - name: docker-sock
+                    hostPath:
+                      path: /var/run/docker.sock
             '''
         }
-    }
-
-    environment {
-        DOCKER_IMAGE = 'yenisehirli/task-manager-api'
-        DOCKER_TAG = "${BUILD_NUMBER}"
-        SONAR_TOKEN = credentials('sonar-token')
     }
 
     stages {
@@ -63,13 +58,9 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    sh '''
-                        until docker info; do
-                            echo "Waiting for docker daemon..."
-                            sleep 5
-                        done
+                    sh """
                         docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
-                    '''
+                    """
                 }
             }
         }
@@ -86,14 +77,6 @@ pipeline {
                         docker push ${DOCKER_IMAGE}:latest
                     '''
                 }
-            }
-        }
-    }
-
-    post {
-        always {
-            container('docker') {
-                sh 'docker logout || true'
             }
         }
     }
