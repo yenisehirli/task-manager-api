@@ -8,16 +8,15 @@ pipeline {
                 spec:
                   containers:
                   - name: docker
-                    image: docker:latest
+                    image: sonarsource/sonar-scanner-cli:latest
                     command:
-                    - sleep
-                    args:
-                    - infinity
+                    - cat
+                    tty: true
                     securityContext:
                       privileged: true
                     volumeMounts:
-                    - name: docker-sock
-                      mountPath: /var/run/docker.sock
+                    - mountPath: /var/run/docker.sock
+                      name: docker-sock
                   volumes:
                   - name: docker-sock
                     hostPath:
@@ -42,22 +41,15 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 container('docker') {
-                    sh '''
-                        wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-4.8.0.2856-linux.zip
-                        unzip sonar-scanner-cli-4.8.0.2856-linux.zip
-                        mv sonar-scanner-4.8.0.2856-linux sonar-scanner
-                    '''
-                    withSonarQubeEnv('SonarQube') {
-                        sh '''
-                            ./sonar-scanner/bin/sonar-scanner \
-                            -Dsonar.host.url=http://10.43.16.30:30900 \
-                            -Dsonar.login=${SONAR_TOKEN} \
-                            -Dsonar.projectKey=task-manager-api \
-                            -Dsonar.projectName='Task Manager API' \
-                            -Dsonar.sources=. \
-                            -Dsonar.python.version=3.9
-                        '''
-                    }
+                    sh """
+                        sonar-scanner \
+                        -Dsonar.host.url=http://10.43.16.30:30900 \
+                        -Dsonar.login=${SONAR_TOKEN} \
+                        -Dsonar.projectKey=task-manager-api \
+                        -Dsonar.projectName='Task Manager API' \
+                        -Dsonar.sources=. \
+                        -Dsonar.python.version=3.9
+                    """
                 }
             }
         }
@@ -65,7 +57,10 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 container('docker') {
-                    sh "docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} ."
+                    sh """
+                        docker build -t ${DOCKER_IMAGE}:${DOCKER_TAG} .
+                        docker tag ${DOCKER_IMAGE}:${DOCKER_TAG} ${DOCKER_IMAGE}:latest
+                    """
                 }
             }
         }
