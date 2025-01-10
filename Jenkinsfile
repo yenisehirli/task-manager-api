@@ -8,12 +8,10 @@ pipeline {
                 spec:
                   containers:
                   - name: docker
-                    image: docker:latest
-                    command:
-                    - cat
-                    tty: true
+                    image: docker:dind
                     securityContext:
                       privileged: true
+                    tty: true
                     volumeMounts:
                     - mountPath: /var/run/docker.sock
                       name: docker-sock
