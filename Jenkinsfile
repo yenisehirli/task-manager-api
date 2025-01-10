@@ -8,7 +8,7 @@ pipeline {
                 spec:
                   containers:
                   - name: docker
-                    image: sonarsource/sonar-scanner-cli:latest
+                    image: docker:latest
                     command:
                     - cat
                     tty: true
@@ -17,6 +17,11 @@ pipeline {
                     volumeMounts:
                     - mountPath: /var/run/docker.sock
                       name: docker-sock
+                  - name: sonar-scanner
+                    image: sonarsource/sonar-scanner-cli:latest
+                    command:
+                    - cat
+                    tty: true
                   volumes:
                   - name: docker-sock
                     hostPath:
@@ -40,7 +45,7 @@ pipeline {
 
         stage('SonarQube Analysis') {
             steps {
-                container('docker') {
+                container('sonar-scanner') {
                     sh """
                         sonar-scanner \
                         -Dsonar.host.url=http://10.43.16.30:30900 \
