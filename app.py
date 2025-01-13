@@ -7,7 +7,7 @@ A simple RESTful API for managing tasks
 Version: 1.0
 """
 
-# deneme  , de ne me
+# pipeline test
 app = Flask(__name__)
 
 
